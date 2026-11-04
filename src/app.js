@@ -1217,7 +1217,16 @@
     var nodes = geo.nodes, vb = geo.vb;
 
     var svg = sv('svg', { class: 'bubbles fill-' + fill, viewBox: vb.map(function (v) { return v.toFixed(2); }).join(' '), preserveAspectRatio: 'xMidYMid meet', role: 'img', 'aria-label': 'Bubble chart of ' + games.length + ' games releasing in ' + monthName(S.month) + ', sized by ' + sd.label.toLowerCase() });
-    svg.appendChild(sv('defs', null, sv('clipPath', { id: 'bClip', clipPathUnits: 'objectBoundingBox' }, sv('circle', { cx: 0.5, cy: 0.5, r: 0.5 }))));
+    // glass fills for Color mode: release-week colour, strong top-left fading to see-through
+    var defs = sv('defs', null, sv('clipPath', { id: 'bClip', clipPathUnits: 'objectBoundingBox' }, sv('circle', { cx: 0.5, cy: 0.5, r: 0.5 })));
+    for (var w = 0; w < 5; w++) {
+      defs.appendChild(sv('linearGradient', { id: 'gw' + w, x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
+        sv('stop', { offset: '0', style: 'stop-color:var(--w' + w + ');stop-opacity:0.92' }),
+        sv('stop', { offset: '0.55', style: 'stop-color:var(--w' + w + ');stop-opacity:0.55' }),
+        sv('stop', { offset: '1', style: 'stop-color:var(--w' + w + ');stop-opacity:0.22' })
+      ]));
+    }
+    svg.appendChild(defs);
     var vp = sv('g', { class: 'viewport' });
     var base = sv('g', { class: 'layer-base' });
     var selL = sv('g', { class: 'layer-sel' });
