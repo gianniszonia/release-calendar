@@ -49,8 +49,8 @@
     month: null,
     view: 'bubbles',
     fill: 'color',
-    // default: Gradient. (Key versioned so earlier saved choices don't override the new default.)
-    paint: (function () { try { var p = localStorage.getItem('grr-paint-v2'); return p === 'frost' || p === 'gradient' || p === 'top10' ? p : 'gradient'; } catch (e) { return 'gradient'; } })(),
+    // default: Top 10. (Key versioned so earlier saved choices don't override the new default.)
+    paint: (function () { try { var p = localStorage.getItem('grr-paint-v3'); return p === 'frost' || p === 'gradient' || p === 'top10' ? p : 'top10'; } catch (e) { return 'top10'; } })(),
     arrange: 'organic',
     size: 'hype',
     server: {},
@@ -1177,8 +1177,8 @@
 
   /* Glass bubble styles (Color mode): 'frost' = clear frosted glass, 'top10' = frosted with the
      10 leaders (by the Size-by metric) tinted, 'gradient' = 3-colour ramp from least to most. */
-  var PAINTS = [{ key: 'gradient', label: 'Gradient' }, { key: 'top10', label: 'Top 10' }, { key: 'frost', label: 'Frosted' }];
-  var RAMP = ['#38bdf8', '#a78bfa', '#fb5c8c'];   // least -> most
+  var PAINTS = [{ key: 'top10', label: 'Top 10' }, { key: 'gradient', label: 'Gradient' }, { key: 'frost', label: 'Frosted' }];
+  var RAMP = ['#00b2ff', '#8b3dff', '#ff2d78'];   // least -> most (vivid cyan, violet, hot pink)
   var RAMP_STEPS = 12;
   function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
   function rampColor(t) {
@@ -1198,8 +1198,8 @@
     for (var s = 0; s < RAMP_STEPS; s++) {
       var c = rampColor(s / (RAMP_STEPS - 1));
       defs.appendChild(sv('linearGradient', { id: 'gR' + s, x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
-        sv('stop', { offset: '0', 'stop-color': c, 'stop-opacity': '0.97' }),
-        sv('stop', { offset: '1', 'stop-color': c, 'stop-opacity': '0.7' })
+        sv('stop', { offset: '0', 'stop-color': c, 'stop-opacity': '1' }),
+        sv('stop', { offset: '1', 'stop-color': c, 'stop-opacity': '0.82' })
       ]));
     }
     defs.appendChild(sv('radialGradient', { id: 'gSheen', cx: '0.35', cy: '0.15', r: '0.6' }, [
@@ -1302,7 +1302,7 @@
         segmented(PAINTS, S.paint, function (k) {
           if (S.paint === k) return;
           S.paint = k;
-          try { localStorage.setItem('grr-paint-v2', k); } catch (e) { /* storage unavailable */ }
+          try { localStorage.setItem('grr-paint-v3', k); } catch (e) { /* storage unavailable */ }
           renderStage();
           if (S.bub) S.bub.svg.classList.add('no-anim');
         }, 'paint-seg'),
