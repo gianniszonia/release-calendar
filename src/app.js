@@ -349,8 +349,11 @@
     window.addEventListener('resize', function () {
       clearTimeout(rz);
       rz = setTimeout(function () {
+        var wasFallback = root.classList.contains('scroll-fallback');
+        checkFit();
         var b = S.bub;
         if (S.view !== 'bubbles' || !b) return;
+        if (wasFallback !== root.classList.contains('scroll-fallback')) { drawBubbles(); S.bub && S.bub.svg.classList.add('no-anim'); applySearchDim(); return; }
         var w = R.stageBody.clientWidth, hh = R.stageBody.clientHeight;
         if (Math.abs(w - b.W) / b.W < 0.06 && Math.abs(hh - b.H) / b.H < 0.06) { updateLabels(); return; }
         drawBubbles();
@@ -597,12 +600,20 @@
 
   /* --------------------------------------------------------------- render */
 
+  // The page normally fits one screen exactly. If the header rows wrap (mid-size windows) and
+  // leave the main panel too short, fall back to a scrolling page with a fixed-height panel.
+  function checkFit() {
+    root.classList.remove('scroll-fallback');
+    if (R.stage && R.stage.getBoundingClientRect().height < 430) root.classList.add('scroll-fallback');
+  }
+
   function render(dataChanged) {
     var rel = (S.byMonth.get(S.month) || []).filter(passLocal);
     S.cur = { rel: rel, games: uniqueGames(rel) };
     renderMonth();
     renderKpis();
     renderFilters();
+    checkFit();
     renderStage();
     ensureSelection(dataChanged);
   }
