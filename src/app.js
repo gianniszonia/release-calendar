@@ -49,7 +49,8 @@
     month: null,
     view: 'bubbles',
     fill: 'color',
-    paint: (function () { try { var p = localStorage.getItem('grr-paint'); return p === 'frost' || p === 'gradient' || p === 'top10' ? p : 'top10'; } catch (e) { return 'top10'; } })(),
+    // default: Gradient. (Key versioned so earlier saved choices don't override the new default.)
+    paint: (function () { try { var p = localStorage.getItem('grr-paint-v2'); return p === 'frost' || p === 'gradient' || p === 'top10' ? p : 'gradient'; } catch (e) { return 'gradient'; } })(),
     arrange: 'organic',
     size: 'hype',
     server: {},
@@ -1176,7 +1177,7 @@
 
   /* Glass bubble styles (Color mode): 'frost' = clear frosted glass, 'top10' = frosted with the
      10 leaders (by the Size-by metric) tinted, 'gradient' = 3-colour ramp from least to most. */
-  var PAINTS = [{ key: 'frost', label: 'Frosted' }, { key: 'top10', label: 'Top 10' }, { key: 'gradient', label: 'Gradient' }];
+  var PAINTS = [{ key: 'gradient', label: 'Gradient' }, { key: 'top10', label: 'Top 10' }, { key: 'frost', label: 'Frosted' }];
   var RAMP = ['#38bdf8', '#a78bfa', '#fb5c8c'];   // least -> most
   var RAMP_STEPS = 12;
   function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
@@ -1191,14 +1192,14 @@
       sv('stop', { offset: '1', style: 'stop-color:var(--bub-bot-c);stop-opacity:var(--bub-bot-o)' })
     ]));
     defs.appendChild(sv('linearGradient', { id: 'gTop', x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
-      sv('stop', { offset: '0', 'stop-color': '#7c6cff', 'stop-opacity': '0.88' }),
-      sv('stop', { offset: '1', 'stop-color': '#3aa0ff', 'stop-opacity': '0.5' })
+      sv('stop', { offset: '0', 'stop-color': '#7c6cff', 'stop-opacity': '0.97' }),
+      sv('stop', { offset: '1', 'stop-color': '#3aa0ff', 'stop-opacity': '0.74' })
     ]));
     for (var s = 0; s < RAMP_STEPS; s++) {
       var c = rampColor(s / (RAMP_STEPS - 1));
       defs.appendChild(sv('linearGradient', { id: 'gR' + s, x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
-        sv('stop', { offset: '0', 'stop-color': c, 'stop-opacity': '0.88' }),
-        sv('stop', { offset: '1', 'stop-color': c, 'stop-opacity': '0.4' })
+        sv('stop', { offset: '0', 'stop-color': c, 'stop-opacity': '0.97' }),
+        sv('stop', { offset: '1', 'stop-color': c, 'stop-opacity': '0.7' })
       ]));
     }
     defs.appendChild(sv('radialGradient', { id: 'gSheen', cx: '0.35', cy: '0.15', r: '0.6' }, [
@@ -1301,7 +1302,7 @@
         segmented(PAINTS, S.paint, function (k) {
           if (S.paint === k) return;
           S.paint = k;
-          try { localStorage.setItem('grr-paint', k); } catch (e) { /* storage unavailable */ }
+          try { localStorage.setItem('grr-paint-v2', k); } catch (e) { /* storage unavailable */ }
           renderStage();
           if (S.bub) S.bub.svg.classList.add('no-anim');
         }, 'paint-seg'),
@@ -1374,6 +1375,11 @@
     // the zoomed clone deserves a sharper cover
     var img = clone.querySelector('image');
     if (img && n.g.cover) img.setAttribute('href', coverVariant(n.g.cover, 't_cover_big'));
+    // glass is see-through: give the zoomed copy a solid backing and hide the original
+    // (opacity, not visibility, so the original keeps receiving mouse events)
+    if (!img) inner.insertBefore(sv('circle', { class: 'b-back', r: n.r.toFixed(2) }), inner.firstChild);
+    n.el.style.opacity = '0';
+    b.cloneSrc = n.el;
     b.hov.appendChild(clone);
     b.clone = clone;
     showTip(n.g, e);
@@ -1382,10 +1388,12 @@
   function removeClone(now) {
     var b = S.bub;
     if (!b || !b.clone) return;
-    var c = b.clone;
-    b.clone = null;
-    if (now) { c.remove(); return; }
+    var c = b.clone, src = b.cloneSrc;
+    b.clone = null; b.cloneSrc = null;
+    if (now) { c.remove(); if (src) src.style.opacity = ''; return; }
     c.classList.add('out');
+    // bring the original back as the zoomed copy shrinks, so there's never a double bubble
+    setTimeout(function () { if (src) src.style.opacity = ''; }, 120);
     setTimeout(function () { c.remove(); }, 230);
   }
 

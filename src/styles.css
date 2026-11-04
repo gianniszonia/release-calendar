@@ -525,17 +525,22 @@ svg.bubbles.dragging { cursor: grabbing; }
 /* Glass bubbles. Frost values are theme-aware; every bubble (colour or cover) gets the same
    frosted rim. Fills are set per bubble from app.js (gFrost / gTop / gR0..gR11). */
 :root, [data-theme="dark"] {
-  --bub-top-c: #ffffff; --bub-top-o: 0.2;
-  --bub-bot-c: #ffffff; --bub-bot-o: 0.04;
-  --bub-rim: rgba(255, 255, 255, 0.4);
+  --bub-top-c: #ffffff; --bub-top-o: 0.34;
+  --bub-bot-c: #c9d2ff; --bub-bot-o: 0.14;
+  --bub-rim: rgba(255, 255, 255, 0.5);
+  --bub-back: rgba(22, 24, 44, 0.92);
 }
 [data-theme="light"] {
-  --bub-top-c: #ffffff; --bub-top-o: 0.85;
-  --bub-bot-c: #ffffff; --bub-bot-o: 0.35;
-  --bub-rim: rgba(40, 40, 90, 0.2);
+  /* lavender-grey glass so bubbles stand out from the pale background */
+  --bub-top-c: #a9b1e6; --bub-top-o: 0.62;
+  --bub-bot-c: #7f89c9; --bub-bot-o: 0.4;
+  --bub-rim: rgba(70, 70, 140, 0.38);
+  --bub-back: rgba(255, 255, 255, 0.95);
 }
 .layer-base .b-circle, .hover-clone .b-circle { stroke: none; filter: none; }
 .b-sheen { fill: url(#gSheen); pointer-events: none; }
+.b-back { fill: var(--bub-back); }
+.bubble { transition: opacity 0.12s ease; }
 .b-ring { fill: none; stroke: var(--bub-rim); stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .bubble.tinted .b-ring { stroke: rgba(255, 255, 255, 0.5); }
 .bubble.has-cover .b-ring { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.6px; }
