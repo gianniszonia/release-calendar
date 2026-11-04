@@ -49,6 +49,7 @@
     month: null,
     view: 'bubbles',
     fill: 'color',
+    paint: (function () { try { var p = localStorage.getItem('grr-paint'); return p === 'frost' || p === 'gradient' || p === 'top10' ? p : 'top10'; } catch (e) { return 'top10'; } })(),
     arrange: 'organic',
     size: 'hype',
     server: {},
@@ -1006,7 +1007,7 @@
     var sd = sizeDef();
     R.stageTitle.textContent = S.view === 'bubbles' ? monthName(S.month || '2026-01') + ' at a glance' : monthName(S.month || '2026-01') + ' calendar';
     R.stageSub.textContent = games.length
-      ? fmtInt(games.length) + ' games' + (S.topN && (S.monthTotals || {})[S.month] > S.topN ? ' (top ' + S.topN + ' by hype of ' + fmtInt(S.monthTotals[S.month]) + ')' : '') + ' · ' + (S.view === 'bubbles' ? 'biggest = most ' + sd.label.toLowerCase() + ', ' + (S.fill === 'cover' ? 'ring' : 'color') + ' = release week' : 'ranked by ' + sd.label.toLowerCase() + ' within each day')
+      ? fmtInt(games.length) + ' games' + (S.topN && (S.monthTotals || {})[S.month] > S.topN ? ' (top ' + S.topN + ' by hype of ' + fmtInt(S.monthTotals[S.month]) + ')' : '') + ' · ' + (S.view === 'bubbles' ? 'biggest = ' + (sd.key === 'rating' ? 'highest rating' : 'most ' + sd.label.toLowerCase()) + (S.fill === 'cover' ? '' : S.paint === 'top10' ? ', top 10 highlighted' : S.paint === 'gradient' ? ', colour = rank' : '') : 'ranked by ' + sd.label.toLowerCase() + ' within each day')
       : 'No games for the current filters';
     R.viewSeg.set(S.view);
     R.sizeLabel.textContent = S.view === 'bubbles' ? 'Size by' : 'Rank by';
@@ -1173,20 +1174,75 @@
     return { nodes: nodes, vb: [0, 0, W, H] };
   }
 
+  /* Glass bubble styles (Color mode): 'frost' = clear frosted glass, 'top10' = frosted with the
+     10 leaders (by the Size-by metric) tinted, 'gradient' = 3-colour ramp from least to most. */
+  var PAINTS = [{ key: 'frost', label: 'Frosted' }, { key: 'top10', label: 'Top 10' }, { key: 'gradient', label: 'Gradient' }];
+  var RAMP = ['#38bdf8', '#a78bfa', '#fb5c8c'];   // least -> most
+  var RAMP_STEPS = 12;
+  function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+  function rampColor(t) {
+    var seg = t <= 0.5 ? [RAMP[0], RAMP[1], t / 0.5] : [RAMP[1], RAMP[2], (t - 0.5) / 0.5];
+    var a = hexRgb(seg[0]), b = hexRgb(seg[1]), k = seg[2];
+    return 'rgb(' + a.map(function (v, j) { return Math.round(v + (b[j] - v) * k); }).join(',') + ')';
+  }
+  function glassDefs(defs) {
+    defs.appendChild(sv('linearGradient', { id: 'gFrost', x1: '0.2', y1: '0', x2: '0.8', y2: '1' }, [
+      sv('stop', { offset: '0', style: 'stop-color:var(--bub-top-c);stop-opacity:var(--bub-top-o)' }),
+      sv('stop', { offset: '1', style: 'stop-color:var(--bub-bot-c);stop-opacity:var(--bub-bot-o)' })
+    ]));
+    defs.appendChild(sv('linearGradient', { id: 'gTop', x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
+      sv('stop', { offset: '0', 'stop-color': '#7c6cff', 'stop-opacity': '0.88' }),
+      sv('stop', { offset: '1', 'stop-color': '#3aa0ff', 'stop-opacity': '0.5' })
+    ]));
+    for (var s = 0; s < RAMP_STEPS; s++) {
+      var c = rampColor(s / (RAMP_STEPS - 1));
+      defs.appendChild(sv('linearGradient', { id: 'gR' + s, x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
+        sv('stop', { offset: '0', 'stop-color': c, 'stop-opacity': '0.88' }),
+        sv('stop', { offset: '1', 'stop-color': c, 'stop-opacity': '0.4' })
+      ]));
+    }
+    defs.appendChild(sv('radialGradient', { id: 'gSheen', cx: '0.35', cy: '0.15', r: '0.6' }, [
+      sv('stop', { offset: '0', 'stop-color': '#fff', 'stop-opacity': '0.42' }),
+      sv('stop', { offset: '1', 'stop-color': '#fff', 'stop-opacity': '0' })
+    ]));
+  }
+  // rank-based tint per node: n.t in [0,1] (1 = most), n.top = among the 10 leaders.
+  // Games with no value for the metric (e.g. unrated) are the "least" end and never top 10.
+  function rankTints(nodes, sd) {
+    var positive = nodes.filter(function (n) { return sd.get(n.g) > 0; }).length;
+    var first = 0;
+    nodes.forEach(function (n, i) {
+      var v = sd.get(n.g);
+      if (i > 0 && v !== sd.get(nodes[i - 1].g)) first = i;
+      n.t = v > 0 ? (positive > 1 ? 1 - first / (positive - 1) : 1) : 0;
+      n.top = v > 0 && first < 10;
+    });
+  }
+
   function buildBubble(n, i, fill) {
     var g = sv('g', { class: 'bubble w' + weekIdx(n.g.day), transform: 'translate(' + n.x.toFixed(2) + ',' + n.y.toFixed(2) + ')' });
     var inner = sv('g', { class: 'inner' });
     inner.style.animationDelay = Math.min(i * 0.8, 900) + 'ms';
     var r = n.r.toFixed(2);
-    inner.appendChild(sv('circle', { class: 'b-circle', r: r }));
+    var base = sv('circle', { class: 'b-circle', r: r });
+    base.style.fill = 'url(#gFrost)';
+    inner.appendChild(base);
     if (fill === 'cover' && n.g.cover) {
       var img = sv('image', { class: 'b-cover', x: -n.r, y: -n.r, width: n.r * 2, height: n.r * 2, preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#bClip)' });
       img.setAttribute('href', coverVariant(n.g.cover, n.r >= 20 ? 't_cover_big' : 't_cover_small'));
       img.addEventListener('error', function () { img.remove(); g.classList.remove('has-cover'); });
       inner.appendChild(img);
-      inner.appendChild(sv('circle', { class: 'b-ring', r: r }));
       g.classList.add('has-cover');
     }
+    if (fill !== 'cover' || !n.g.cover) {
+      var paint = S.paint;
+      var f = 'url(#gFrost)';
+      if (paint === 'top10' && n.top) { f = 'url(#gTop)'; g.classList.add('tinted'); }
+      if (paint === 'gradient') { f = 'url(#gR' + Math.round(n.t * (RAMP_STEPS - 1)) + ')'; g.classList.add('tinted'); }
+      base.style.fill = f;
+      inner.appendChild(sv('ellipse', { class: 'b-sheen', cx: 0, cy: (-n.r * 0.42).toFixed(2), rx: (n.r * 0.62).toFixed(2), ry: (n.r * 0.38).toFixed(2) }));
+    }
+    inner.appendChild(sv('circle', { class: 'b-ring', r: r }));
     g.appendChild(inner);
     n.el = g; n.inner = inner;
     g.addEventListener('mouseenter', function (e) { hoverIn(n, e); });
@@ -1217,16 +1273,10 @@
     var nodes = geo.nodes, vb = geo.vb;
 
     var svg = sv('svg', { class: 'bubbles fill-' + fill, viewBox: vb.map(function (v) { return v.toFixed(2); }).join(' '), preserveAspectRatio: 'xMidYMid meet', role: 'img', 'aria-label': 'Bubble chart of ' + games.length + ' games releasing in ' + monthName(S.month) + ', sized by ' + sd.label.toLowerCase() });
-    // glass fills for Color mode: release-week colour, strong top-left fading to see-through
     var defs = sv('defs', null, sv('clipPath', { id: 'bClip', clipPathUnits: 'objectBoundingBox' }, sv('circle', { cx: 0.5, cy: 0.5, r: 0.5 })));
-    for (var w = 0; w < 5; w++) {
-      defs.appendChild(sv('linearGradient', { id: 'gw' + w, x1: '0.15', y1: '0', x2: '0.85', y2: '1' }, [
-        sv('stop', { offset: '0', style: 'stop-color:var(--w' + w + ');stop-opacity:0.92' }),
-        sv('stop', { offset: '0.55', style: 'stop-color:var(--w' + w + ');stop-opacity:0.55' }),
-        sv('stop', { offset: '1', style: 'stop-color:var(--w' + w + ');stop-opacity:0.22' })
-      ]));
-    }
+    glassDefs(defs);
     svg.appendChild(defs);
+    rankTints(nodes, sd);
     var vp = sv('g', { class: 'viewport' });
     var base = sv('g', { class: 'layer-base' });
     var selL = sv('g', { class: 'layer-sel' });
@@ -1238,14 +1288,26 @@
     nodes.forEach(function (n, i) { base.appendChild(buildBubble(n, i, fill)); });
     body.appendChild(svg);
 
-    var legend = h('div', { class: 'legend glass' }, h('span', { class: 'lg-title', text: fill === 'cover' ? 'Ring = release week' : 'Release week' }));
-    WEEKS.forEach(function (w, i) {
-      var b = h('button', { type: 'button', class: 'lg w' + i }, [h('i'), w]);
-      b.addEventListener('mouseenter', function () { svg.setAttribute('data-focus', i); });
-      b.addEventListener('mouseleave', function () { svg.removeAttribute('data-focus'); });
-      legend.appendChild(b);
-    });
-    body.appendChild(legend);
+    // bottom-left: bubble style switcher (Color mode) + what the colour means
+    if (fill !== 'cover') {
+      var metric = sd.label.toLowerCase();
+      var key = null;
+      if (S.paint === 'top10') {
+        key = h('span', { class: 'paint-key' }, [h('i', { class: 'swatch top' }), 'Top 10 by ' + metric]);
+      } else if (S.paint === 'gradient') {
+        key = h('span', { class: 'paint-key' }, [h('span', { text: sd.key === 'rating' ? 'Lower' : 'Less' }), h('i', { class: 'ramp', style: 'background:linear-gradient(90deg,' + RAMP.join(',') + ')' }), h('span', { text: sd.key === 'rating' ? 'Higher rating' : 'More ' + metric })]);
+      }
+      body.appendChild(h('div', { class: 'legend paint-legend glass' }, [
+        segmented(PAINTS, S.paint, function (k) {
+          if (S.paint === k) return;
+          S.paint = k;
+          try { localStorage.setItem('grr-paint', k); } catch (e) { /* storage unavailable */ }
+          renderStage();
+          if (S.bub) S.bub.svg.classList.add('no-anim');
+        }, 'paint-seg'),
+        key
+      ]));
+    }
 
     body.appendChild(h('div', { class: 'zoom-ctl glass' }, [
       h('button', { type: 'button', class: 'icon-btn', title: 'Zoom in', 'aria-label': 'Zoom in', onclick: function () { zoomBy(1.6); } }, icon('plus')),

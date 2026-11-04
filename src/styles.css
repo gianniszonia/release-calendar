@@ -522,23 +522,36 @@ svg.bubbles.dragging { cursor: grabbing; }
 .bubbles[data-focus="3"] .layer-base .bubble:not(.w3),
 .bubbles[data-focus="4"] .layer-base .bubble:not(.w4) { opacity: 0.1; }
 
-/* cover-art circles: cover clipped to the circle, release-week ring */
-.b-ring { fill: none; stroke-width: 2.2px; vector-effect: non-scaling-stroke; pointer-events: none; }
-.bubble.w0 .b-ring { stroke: var(--w0); } .bubble.w1 .b-ring { stroke: var(--w1); }
-.bubble.w2 .b-ring { stroke: var(--w2); } .bubble.w3 .b-ring { stroke: var(--w3); }
-.bubble.w4 .b-ring { stroke: var(--w4); }
+/* Glass bubbles. Frost values are theme-aware; every bubble (colour or cover) gets the same
+   frosted rim. Fills are set per bubble from app.js (gFrost / gTop / gR0..gR11). */
+:root, [data-theme="dark"] {
+  --bub-top-c: #ffffff; --bub-top-o: 0.2;
+  --bub-bot-c: #ffffff; --bub-bot-o: 0.04;
+  --bub-rim: rgba(255, 255, 255, 0.4);
+}
+[data-theme="light"] {
+  --bub-top-c: #ffffff; --bub-top-o: 0.85;
+  --bub-bot-c: #ffffff; --bub-bot-o: 0.35;
+  --bub-rim: rgba(40, 40, 90, 0.2);
+}
+.layer-base .b-circle, .hover-clone .b-circle { stroke: none; filter: none; }
+.b-sheen { fill: url(#gSheen); pointer-events: none; }
+.b-ring { fill: none; stroke: var(--bub-rim); stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.bubble.tinted .b-ring { stroke: rgba(255, 255, 255, 0.5); }
+.bubble.has-cover .b-ring { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.6px; }
+[data-theme="light"] .bubble.has-cover .b-ring { stroke: rgba(255, 255, 255, 0.9); }
 .bubbles.no-anim .layer-base .inner { animation: none; }
-
-/* Color mode: glassy translucent gradient circles with a crisp edge in the week colour */
-.bubbles.fill-color .b-circle { stroke-width: 1.3px; stroke-opacity: 0.9; vector-effect: non-scaling-stroke; }
-.bubbles.fill-color .bubble.w0 .b-circle { fill: url(#gw0); stroke: var(--w0); }
-.bubbles.fill-color .bubble.w1 .b-circle { fill: url(#gw1); stroke: var(--w1); }
-.bubbles.fill-color .bubble.w2 .b-circle { fill: url(#gw2); stroke: var(--w2); }
-.bubbles.fill-color .bubble.w3 .b-circle { fill: url(#gw3); stroke: var(--w3); }
-.bubbles.fill-color .bubble.w4 .b-circle { fill: url(#gw4); stroke: var(--w4); }
 .bubbles.fill-color .b-label { fill: var(--text); stroke: var(--bg); stroke-opacity: 0.35; paint-order: stroke; stroke-linejoin: round; }
-.bubbles.fill-color .hover-clone .b-circle { stroke: var(--text); stroke-opacity: 1; }
+.hover-clone .b-ring { stroke: var(--text); stroke-width: 2px; }
 .b-label.on-cover { fill: #fff; stroke: rgba(0, 0, 0, 0.72); paint-order: stroke; stroke-linejoin: round; }
+
+/* bottom-left bubble style switcher */
+.paint-legend { align-items: center; gap: 10px; padding: 5px 10px 5px 5px; }
+.paint-legend .seg button { padding: 5px 12px; font-size: 12px; }
+.paint-key { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.paint-key .swatch { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.paint-key .swatch.top { background: linear-gradient(135deg, rgba(124, 108, 255, 0.95), rgba(58, 160, 255, 0.6)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5); }
+.paint-key .ramp { width: 84px; height: 8px; border-radius: 4px; display: block; opacity: 0.9; }
 .hover-clone { pointer-events: none; }
 .hover-clone .inner { animation: zoomIn 0.38s cubic-bezier(0.25, 1.5, 0.45, 1) forwards !important; }
 .hover-clone .b-circle { stroke: #fff; stroke-width: 2.5px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
