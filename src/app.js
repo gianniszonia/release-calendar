@@ -102,6 +102,9 @@
     var p = ymd(s); var dt = new Date(p.y, p.m - 1, p.d);
     return (long ? DOW_LONG[dt.getDay()] + ', ' : DOW_LONG[dt.getDay()].slice(0, 3) + ', ') + MON3[p.m - 1] + ' ' + p.d + ', ' + p.y;
   }
+  function isRe(g) { return g.released && g.released.has('Re-Release') && !g.released.has('First Release'); }
+  function relLabel(g) { return isRe(g) ? 'Re-Release' : 'First Release'; }
+  function fmtShort(s) { var p = ymd(s); return MON3[p.m - 1] + ' ' + p.d + (p.y !== +String(S.month || '').slice(0, 4) ? ', ' + p.y : ''); }
   function monthName(key) { var p = key.split('-'); return MONTHS[+p[1] - 1] + ' ' + p[0]; }
   function todayKey() {
     var t = new Date();
@@ -501,6 +504,16 @@
       l.push(g);
     });
     S.allMonths = Array.from(S.byMonth.keys()).sort();
+    // every release date of each game (a game can have a First Release and Re-Releases)
+    S.relById = new Map();
+    S.byMonth.forEach(function (l) {
+      l.forEach(function (g) {
+        var a = S.relById.get(g.id);
+        if (!a) S.relById.set(g.id, a = []);
+        a.push(g);
+      });
+    });
+    S.relById.forEach(function (a) { a.sort(function (x, y) { return x.date < y.date ? -1 : 1; }); });
     S.monthCounts = new Map();
     S.byMonth.forEach(function (l, k) { S.monthCounts.set(k, uniqueGames(l).length); });
   }
@@ -671,7 +684,7 @@
     clear(R.kpis.games.sub);
     var total = S.monthTotals && S.monthTotals[S.month];
     if (S.topN && total > S.topN) {
-      R.kpis.games.sub.textContent = 'top ' + fmtInt(S.topN) + ' of ' + fmtInt(total) + ' releasing';
+      R.kpis.games.sub.textContent = 'top ' + fmtInt(S.topN) + ' of ' + fmtInt(total) + ' releasing' + (n > S.topN ? ' + ' + (n - S.topN) + ' from another month' : '');
     } else if (prevN > 0) {
       var ch = (n - prevN) / prevN;
       append(R.kpis.games.sub, [h('span', { class: ch >= 0 ? 'up' : 'down', text: (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(ch * 100)) + '%' }), ' vs ' + MON3[pm - 1]]);
@@ -1008,7 +1021,7 @@
     var sd = sizeDef();
     R.stageTitle.textContent = S.view === 'bubbles' ? monthName(S.month || '2026-01') + ' at a glance' : monthName(S.month || '2026-01') + ' calendar';
     R.stageSub.textContent = games.length
-      ? fmtInt(games.length) + ' games' + (S.topN && (S.monthTotals || {})[S.month] > S.topN ? ' (top ' + S.topN + ' by hype of ' + fmtInt(S.monthTotals[S.month]) + ')' : '') + ' · ' + (S.view === 'bubbles' ? 'biggest = ' + (sd.key === 'rating' ? 'highest rating' : 'most ' + sd.label.toLowerCase()) + (S.fill === 'cover' ? '' : S.paint === 'top10' ? ', top 10 highlighted' : S.paint === 'gradient' ? ', colour = rank' : '') : 'ranked by ' + sd.label.toLowerCase() + ' within each day')
+      ? fmtInt(games.length) + ' games' + (S.topN && (S.monthTotals || {})[S.month] > S.topN ? ' (top ' + S.topN + ' by hype of ' + fmtInt(S.monthTotals[S.month]) + (games.length > S.topN ? ', plus ' + (games.length - S.topN) + ' that made the top ' + S.topN + ' in another month' : '') + ')' : '') + ' · ' + (S.view === 'bubbles' ? 'biggest = ' + (sd.key === 'rating' ? 'highest rating' : 'most ' + sd.label.toLowerCase()) + (S.fill === 'cover' ? '' : S.paint === 'top10' ? ', top 10 highlighted' : S.paint === 'gradient' ? ', colour = rank' : '') : 'ranked by ' + sd.label.toLowerCase() + ' within each day')
       : 'No games for the current filters';
     R.viewSeg.set(S.view);
     R.sizeLabel.textContent = S.view === 'bubbles' ? 'Size by' : 'Rank by';
@@ -1039,7 +1052,10 @@
       media.appendChild(img);
     }
     var pills = h('div', { class: 'tip-pills' });
+    pills.appendChild(h('span', { class: 'tip-pill ' + (isRe(g) ? 're' : 'first'), text: relLabel(g) }));
     g.status.forEach(function (s) { pills.appendChild(h('span', { class: 'tip-pill', text: s })); });
+    var others = (S.relById && S.relById.get(g.id) || []).filter(function (x) { return x.date !== g.date; });
+    if (others.length) pills.appendChild(h('span', { class: 'tip-also', text: 'Also: ' + others.map(function (x) { return fmtShort(x.date) + (isRe(x) ? ' (re-release)' : ' (first release)'); }).join(', ') }));
     append(R.tip, [
       h('div', { class: 'tip-top' }, [
         media,
@@ -1528,7 +1544,7 @@
         cell.appendChild(h('div', { class: 'cal-head' }, [h('span', { class: 'cal-day', text: d }), list.length ? h('span', { class: 'cal-count', text: fmtInt(list.length) }) : null]));
         list.slice(0, 3).forEach(function (g) {
           var it = h('button', { type: 'button', class: 'cal-item w' + weekIdx(g.day), 'data-id': g.id, 'data-name': g.name.toLowerCase(), 'aria-label': g.name }, [
-            h('span', { class: 'cal-dot' }), h('span', { class: 'cal-name', text: g.name }), h('span', { class: 'cal-metric', text: sd.get(g) > 0 ? compactNf.format(sd.get(g)) : '' })
+            h('span', { class: 'cal-dot' }), h('span', { class: 'cal-name', text: g.name }), isRe(g) ? h('span', { class: 'cal-re', text: 'Re', title: 'Re-release' }) : null, h('span', { class: 'cal-metric', text: sd.get(g) > 0 ? compactNf.format(sd.get(g)) : '' })
           ]);
           it.addEventListener('click', function (e) { e.stopPropagation(); select(g); });
           it.addEventListener('mouseenter', function (e) { showTip(g, e); });
@@ -1561,7 +1577,7 @@
       rows.appendChild(h('button', { type: 'button', class: 'row', style: 'animation-delay:' + Math.min(i * 18, 500) + 'ms', onclick: function () { select(g); }, onmouseenter: function (e) { showTip(g, e); }, onmousemove: moveTip, onmouseleave: closeTip }, [
         h('span', { class: 'rank', text: i + 1 }),
         h('span', { class: 'avatar w' + weekIdx(g.day), text: initials(g.name) }),
-        h('span', { class: 'r-main' }, [h('div', { class: 'r-name', text: g.name }), h('div', { class: 'r-meta', text: Array.from(g.status).join(', ') + ' · ' + Array.from(g.released).join(', ') })]),
+        h('span', { class: 'r-main' }, [h('div', { class: 'r-name', text: g.name }), h('div', { class: 'r-meta', text: relLabel(g) + ' · ' + Array.from(g.status).join(', ') })]),
         h('span', { class: 'r-stats' }, [
           h('span', null, [h('b', { text: fmtInt(g.hype) }), ' hype']),
           h('span', null, [h('b', { text: g.rating > 0 ? nf1.format(g.rating) : '–' }), ' rating'])
@@ -1610,7 +1626,7 @@
   }
 
   function select(g) {
-    if (S.selected && S.selected.id === g.id && R.detailInner.dataset.id === String(g.id)) { markSelected(); return; }
+    if (S.selected && S.selected.key === g.key && R.detailInner.dataset.key === g.key) { markSelected(); return; }
     S.selected = g;
     markSelected();
     renderDetail(g);
@@ -1641,6 +1657,7 @@
     var inner = R.detailInner;
     clear(inner);
     inner.dataset.id = g.id;
+    inner.dataset.key = g.key;
     inner.classList.remove('swap'); void inner.offsetWidth; inner.classList.add('swap');
 
     // hero
@@ -1654,8 +1671,8 @@
     var links = h('div', { class: 'hero-links' });
     if (g.url) links.appendChild(h('a', { class: 'link-btn', href: g.url, target: '_blank', rel: 'noopener noreferrer' }, [icon('ext'), 'IGDB page']));
     var pills = h('div', { class: 'pills' }, [h('span', { class: 'pill accent', text: fmtDate(g.date) })]);
+    pills.appendChild(h('span', { class: 'pill ' + (isRe(g) ? 're' : 'first'), text: relLabel(g) }));
     g.status.forEach(function (s) { pills.appendChild(h('span', { class: 'pill', text: s })); });
-    g.released.forEach(function (s) { pills.appendChild(h('span', { class: 'pill', text: s })); });
     var hero = h('div', { class: 'hero' }, [
       bg,
       h('div', { class: 'cover' }, imgOrFallback(g.cover, null, function () { return coverFallback(g); })),
@@ -1696,7 +1713,28 @@
     });
     var facetWrap = h('div', { class: 'section' }, [h('div', { class: 'section-title', text: 'Details' }), facets]);
 
-    append(inner, [hero, sumWrap, R.metricsSlot, videoWrap, facetWrap]);
+    // all release dates of this game (click one to jump to that month)
+    var allRel = (S.relById && S.relById.get(g.id)) || [g];
+    var datesWrap = null;
+    if (allRel.length > 1) {
+      var list = h('div', { class: 'rel-dates' });
+      allRel.forEach(function (x) {
+        var cur = x.date === g.date;
+        list.appendChild(h('button', { type: 'button', class: 'rel-date' + (cur ? ' current' : ''), title: cur ? 'Showing this date' : 'Go to ' + monthName(x.month), onclick: function () {
+          if (cur) return;
+          setMonth(x.month).then(function () {
+            var inMonth = S.cur.games.filter(function (y) { return y.id === x.id; })[0];
+            if (inMonth) { select(inMonth); focusBubble(inMonth.id); }
+          });
+        } }, [
+          h('span', { class: 'rd-date', text: fmtDate(x.date) }),
+          h('span', { class: 'pill ' + (isRe(x) ? 're' : 'first'), text: relLabel(x) })
+        ]));
+      });
+      datesWrap = h('div', { class: 'section' }, [h('div', { class: 'section-title', text: 'Release dates' }), list]);
+    }
+
+    append(inner, [hero, datesWrap, sumWrap, R.metricsSlot, videoWrap, facetWrap]);
     if (R.detail.firstChild) R.detail.firstChild.scrollTop = 0;
 
     loadDetails(g.id).then(function (det) {
