@@ -926,7 +926,13 @@
       var ap = a.name.toLowerCase().indexOf(q) === 0 ? 0 : 1, bp = b.name.toLowerCase().indexOf(q) === 0 ? 0 : 1;
       return am - bm || ap - bp || b.hype - a.hype || a.name.localeCompare(b.name);
     });
-    return out.slice(0, 8);
+    // one row per release date: a game's First Release and each Re-Release are listed separately
+    var rows = [];
+    out.slice(0, 8).forEach(function (g) {
+      var all = (S.relById && S.relById.get(g.id)) || [g];
+      all.forEach(function (x) { rows.push(x); });
+    });
+    return rows.slice(0, 14);
   }
 
   function openResults() {
@@ -947,7 +953,7 @@
       items.forEach(function (g, i) {
         pop.appendChild(h('button', { type: 'button', class: 'result', 'data-i': i, onmousedown: function (e) { e.preventDefault(); pickResult(g); } }, [
           h('span', { class: 'avatar w' + weekIdx(g.day), text: initials(g.name) }),
-          h('span', { class: 'r-main' }, [h('div', { class: 'r-name', text: g.name }), h('div', { class: 'r-meta', text: fmtDate(g.date) + (g.month === S.month ? ' · this month' : '') })]),
+          h('span', { class: 'r-main' }, [h('div', { class: 'r-name', text: g.name }), h('div', { class: 'r-meta' }, [h('span', { class: 'r-rel ' + (isRe(g) ? 're' : 'first'), text: relLabel(g) }), ' ' + fmtDate(g.date) + (g.month === S.month ? ' · this month' : '')])]),
           h('span', { class: 'r-hype', text: '♥ ' + fmtInt(g.hype) })
         ]));
       });
@@ -998,8 +1004,10 @@
     closePopover();
     R.searchInput.blur();
     setMonth(g.month).then(function () {
-      var inMonth = S.cur.games.filter(function (x) { return x.id === g.id; })[0];
-      if (!inMonth) { toast(g.name + ' is hidden by the Released?/Status filters.'); return; }
+      // pick the exact release date that was chosen (First Release or a Re-Release)
+      var inMonth = S.cur.rel.filter(function (x) { return x.key === g.key; })[0] ||
+        S.cur.games.filter(function (x) { return x.id === g.id; })[0];
+      if (!inMonth) { toast(g.name + ' (' + relLabel(g) + ') is hidden by the current filters.'); return; }
       select(inMonth);
       focusBubble(inMonth.id);
     });
